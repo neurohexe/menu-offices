@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=5.0">
+  <title>Сроки после вскрытия</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1C4587">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Сроки">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --navy:  #1C4587;
+      --blue:  #4A86E8;
+      --bg:    #F4F6FA;
+      --white: #FFFFFF;
+      --brd:   #D0D8E8;
+      --text:  #111827;
+      --muted: #475569;
+      --act:   #E8F0FE;
+      /* цвета сроков */
+      --t0-bg:#FDECEC; --t0:#C62828;   /* сразу */
+      --t1-bg:#FFF1E0; --t1:#C25E00;   /* до 3 дней */
+      --t2-bg:#FFF8D6; --t2:#8A6A00;   /* до 14 дней */
+      --t3-bg:#E8F5E9; --t3:#2E7D32;   /* до 60 дней */
+      --t4-bg:#E6EEFB; --t4:#1C4587;   /* дольше */
+      --tn-bg:#EEF1F5; --tn:#475569;   /* по упаковке */
+    }
+    html,body { min-height:100%; background:var(--bg);
+      font-family:'Segoe UI',Roboto,Arial,sans-serif; color:var(--text); font-size:17px; }
+    button { font-family:inherit; }
+
+    /* ── ШАПКА ── */
+    .header {
+      background:var(--navy); color:#fff; padding:10px 16px;
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .top { position:sticky; top:0; z-index:20; box-shadow:0 2px 8px rgba(0,0,0,.2); }
+    .h-left { min-width:0; }
+    .h-title { font-size:22px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .t-short { display:none; }
+    .h-sub { font-size:14px; opacity:.85; margin-top:1px; }
+    .h-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    .h-clock { font-size:26px; font-weight:300; letter-spacing:2px; margin-right:4px; }
+    .btn-hdr {
+      background:rgba(255,255,255,.15); color:#fff;
+      border:1px solid rgba(255,255,255,.3);
+      border-radius:10px; padding:10px 14px; font-size:16px; cursor:pointer; min-height:46px; min-width:46px;
+    }
+    .btn-region { font-weight:600; }
+    .btn-install { display:none; }
+
+    /* ── ВКЛАДКИ ── */
+    .tabs { display:flex; background:var(--navy); border-top:1px solid rgba(255,255,255,.15); }
+    .tab { flex:1; text-align:center; padding:13px 4px; font-size:18px; font-weight:600;
+           color:rgba(255,255,255,.7); cursor:pointer; border-bottom:3px solid transparent; }
+    .tab.active { color:#fff; border-bottom:4px solid #fff; }
+
+    .panel { display:none; padding:14px 14px 28px; max-width:1200px; margin:0 auto; }
+    .panel.active { display:block; }
+
+    /* ── ПОИСК И ФИЛЬТРЫ ── */
+    .search {
+      display:flex; align-items:center; gap:10px;
+      background:var(--white); border:2px solid var(--brd); border-radius:14px;
+      padding:0 14px; box-shadow:0 1px 6px rgba(0,0,0,.05);
+    }
+    .search svg { flex-shrink:0; color:var(--muted); }
+    .search input { flex:1; min-width:0; border:0; outline:0; font-size:20px; padding:16px 0; background:transparent; color:var(--text); }
+    .search .clr { border:0; background:none; font-size:30px; min-width:44px; color:var(--muted); cursor:pointer; display:none; padding:4px; }
+    .search.has .clr { display:block; }
+
+    .filters { display:flex; gap:8px; overflow-x:auto; padding:12px 0 4px; scrollbar-width:none; }
+    .filters::-webkit-scrollbar { display:none; }
+    .fchip {
+      flex-shrink:0; border:1px solid var(--brd); background:var(--white); color:var(--text);
+      border-radius:24px; padding:11px 18px; font-size:17px; cursor:pointer; white-space:nowrap; min-height:48px;
+    }
+    .fchip .cnt { color:var(--muted); font-size:15px; margin-left:6px; }
+    .fchip.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .fchip.on .cnt { color:rgba(255,255,255,.7); }
+    .filters.storage { flex-wrap:wrap; overflow:visible; }
+    .cat-select { display:none; width:100%; margin-top:12px; font-size:19px; font-family:inherit; color:var(--text);
+      padding:14px 44px 14px 16px; border:2px solid var(--brd); border-radius:14px; background:var(--white);
+      -webkit-appearance:none; appearance:none; min-height:56px;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%231C4587' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 16px center; }
+
+    /* ── СПИСОК ── */
+    .cat-title {
+      font-size:19px; font-weight:800;
+      color:var(--navy); margin:26px 2px 12px; padding-bottom:6px; border-bottom:2px solid var(--brd);
+    }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(420px, 1fr)); gap:12px; }
+    .grid > *, .rules > * { min-width:0; }
+    .card {
+      background:var(--white); border-radius:14px; padding:14px 16px;
+      box-shadow:0 1px 6px rgba(0,0,0,.08); cursor:pointer;
+      display:flex; gap:14px; align-items:center; border:2px solid transparent;
+      transition:border-color .15s, transform .1s;
+    }
+    .card:active { transform:scale(.99); border-color:var(--blue); }
+    .badge {
+      flex-shrink:0; width:96px; height:76px; border-radius:12px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+      font-weight:700; line-height:1.05;
+    }
+    .badge .num { font-size:30px; }
+    .badge .unit { font-size:14px; font-weight:700; margin-top:3px; }
+    .badge.word .num { font-size:19px; }
+    .t0 { background:var(--t0-bg); color:var(--t0); }
+    .t1 { background:var(--t1-bg); color:var(--t1); }
+    .t2 { background:var(--t2-bg); color:var(--t2); }
+    .t3 { background:var(--t3-bg); color:var(--t3); }
+    .t4 { background:var(--t4-bg); color:var(--t4); }
+    .tn { background:var(--tn-bg); color:var(--tn); }
+    .c-body { min-width:0; flex:1; }
+    .c-name { font-size:20px; font-weight:700; line-height:1.3; }
+    .c-store { font-size:17px; color:var(--muted); margin-top:6px; line-height:1.35; }
+
+    mark { background:#FFF3B0; color:inherit; border-radius:3px; padding:0 1px; }
+
+    /* ── КАРТОЧКА ПРОДУКТА (лист) ── */
+    .overlay { position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:50;
+               display:none; align-items:flex-end; justify-content:center; }
+    .overlay.open { display:flex; }
+    .sheet {
+      background:var(--bg); width:100%; max-width:640px; max-height:92vh; overflow-y:auto;
+      border-radius:20px 20px 0 0; padding:0 0 24px; animation:up .2s ease-out;
+    }
+    @media (min-width:700px) {
+      .overlay { align-items:center; }
+      .sheet { border-radius:20px; max-height:88vh; }
+    }
+    @keyframes up { from { transform:translateY(40px); opacity:.4; } to { transform:none; opacity:1; } }
+    .sh-head { background:var(--white); padding:16px 18px 16px; border-bottom:1px solid var(--brd);
+               position:sticky; top:0; z-index:2; display:flex; gap:12px; align-items:flex-start; }
+    .sh-head .c-body { padding-top:2px; }
+    .sh-cat { font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; }
+    .sh-name { font-size:24px; font-weight:800; line-height:1.25; margin-top:3px; }
+    .sh-close { border:0; background:var(--act); width:52px; height:52px; border-radius:50%;
+                font-size:30px; color:var(--navy) !important; color:var(--muted); cursor:pointer; flex-shrink:0; }
+    .sh-sec { margin:12px 14px 0; background:var(--white); border-radius:12px; padding:14px 16px;
+              box-shadow:0 1px 4px rgba(0,0,0,.05); }
+    .sh-lbl { font-size:16px; font-weight:700; color:var(--muted); margin-bottom:6px; }
+    .sh-big { font-size:28px; font-weight:800; }
+    .sh-txt { font-size:19px; line-height:1.5; }
+
+    .calc { border:2px solid var(--blue); }
+    .calc-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .calc input[type=datetime-local] {
+      font-size:19px; padding:12px 14px; border:2px solid var(--brd); border-radius:12px; min-height:52px;
+      background:var(--white); color:var(--text); font-family:inherit;
+    }
+    .btn { border:0; border-radius:12px; padding:14px 22px; font-size:18px; font-weight:700; cursor:pointer; min-height:52px; }
+    .btn-pri { background:var(--navy); color:#fff; }
+    .btn-sec { background:var(--act); color:var(--navy); }
+    .until { margin-top:14px; padding:14px; border-radius:10px; background:var(--act); }
+    .until .u-lbl { font-size:17px; color:var(--muted); font-weight:600; }
+    .until .u-val { font-size:34px; font-weight:800; color:var(--navy); margin-top:2px; }
+    .until .u-note { font-size:16px; color:var(--muted); margin-top:6px; }
+    .until.now { background:var(--t0-bg); }
+    .until.now .u-val { color:var(--t0); font-size:26px; }
+
+    .label-prev { margin-top:12px; border:1.5px dashed var(--brd); border-radius:10px; padding:12px 14px;
+                  font-size:17px; line-height:1.5; background:#FCFDFE; }
+    .label-prev > div { display:grid; grid-template-columns:140px 1fr; gap:8px; }
+    .label-prev b { color:var(--muted); font-weight:600; }
+
+    details.basis { margin:14px 14px 0; font-size:16px; color:var(--muted); }
+    details.basis summary { cursor:pointer; padding:6px 2px; }
+    details.basis p { padding:4px 2px; line-height:1.45; }
+
+    /* ── ПРАВИЛА ── */
+    .notice {
+      background:#FFF8E1; border-left:4px solid #F9A825; border-radius:10px;
+      padding:14px 16px; font-size:18px; line-height:1.5; margin-bottom:16px;
+    }
+    .rules { display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:12px; }
+    .rule { background:var(--white); border-radius:12px; padding:14px 16px; box-shadow:0 1px 6px rgba(0,0,0,.07);
+            display:flex; gap:12px; }
+    .rule .rn { flex-shrink:0; width:40px; height:40px; border-radius:50%; background:var(--navy); color:#fff;
+                font-weight:700; display:flex; align-items:center; justify-content:center; font-size:19px; }
+    .rule .rt { font-size:20px; font-weight:700; margin-bottom:4px; }
+    .rule .rx { font-size:18px; line-height:1.5; }
+
+    .legend { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 16px; }
+    .legend .lg { font-size:17px; font-weight:700; border-radius:10px; padding:8px 14px; }
+
+    /* ── РЕГИОН ── */
+    .reg-list { padding:8px 14px 4px; }
+    .reg-item { display:block; width:100%; text-align:left; background:var(--white); border:2px solid var(--brd);
+                border-radius:14px; padding:18px; font-size:20px; margin-bottom:8px; cursor:pointer; color:var(--text); }
+    .reg-item.on { border-color:var(--navy); background:var(--act); font-weight:700; color:var(--navy); }
+
+    /* ── ПУСТО / ЗАГРУЗКА ── */
+    .empty { text-align:center; padding:50px 16px; color:var(--muted); }
+    .empty .ico { font-size:44px; margin-bottom:12px; }
+    .empty .ttl { font-size:20px; font-weight:600; color:var(--text); margin-bottom:5px; }
+    .spin { width:32px; height:32px; margin:0 auto 12px; border:3px solid var(--brd); border-top-color:var(--blue);
+            border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .status-bar { text-align:center; font-size:14px; color:var(--muted); padding:6px; }
+
+    @media (max-width:520px) {
+      .h-clock { display:none; }
+      .grid { grid-template-columns:minmax(0,1fr); }
+      .rules { grid-template-columns:minmax(0,1fr); }
+      .h-title { font-size:21px; }
+      .h-sub { display:none; }
+      .t-long { display:none; } .t-short { display:inline; }
+      .btn-region .rg-name { display:none; }
+      .panel { padding:12px 10px 28px; }
+      .card { padding:14px 12px; gap:12px; }
+      .badge { width:84px; height:72px; }
+      .c-name { font-size:19px; }
+      .sh-head { padding:14px; }
+      .sh-sec { margin:10px 8px 0; padding:14px; }
+      .label-prev > div { grid-template-columns:1fr; gap:0; margin-bottom:6px; }
+      #catFilters { display:none; }
+      .cat-select { display:block !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="top">
+<!-- ШАПКА -->
+<div class="header">
+  <div class="h-left">
+    <div class="h-title"><span class="t-long">Сроки после вскрытия</span><span class="t-short">Сроки</span></div>
+    <div class="h-sub" id="hSub">Загрузка…</div>
+  </div>
+  <div class="h-right">
+    <div class="h-clock" id="hClock">—:—</div>
+    <button class="btn-hdr btn-region" id="btnRegion" onclick="openRegions()">—</button>
+    <button class="btn-hdr" onclick="loadAll()" title="Обновить">↻</button>
+    <button class="btn-hdr btn-install" id="btnInstall" onclick="installPWA()">⬇ Установить</button>
+  </div>
+</div>
+
+<!-- ВКЛАДКИ -->
+<div class="tabs">
+  <div class="tab active" id="tab-list"  onclick="switchTab('list')">🥫 Продукты</div>
+  <div class="tab"        id="tab-rules" onclick="switchTab('rules')">📋 Правила</div>
+</div>
+</div>
+
+<!-- ПРОДУКТЫ -->
+<div class="panel active" id="panel-list">
+  <div class="search" id="searchBox">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="q" type="text" inputmode="search" enterkeyhint="search" placeholder="Поиск: орехи, молоко…" autocomplete="off" oninput="onSearch()">
+    <button class="clr" onclick="clearSearch()" aria-label="Очистить">×</button>
+  </div>
+  <div class="filters" id="catFilters"></div>
+  <select class="cat-select" id="catSelect" onchange="setFilter('cat', this.value)"></select>
+  <div class="filters storage" id="storeFilters"></div>
+  <div id="list"><div class="empty"><div class="spin"></div>Загружаем перечень…</div></div>
+</div>
+
+<!-- ПРАВИЛА -->
+<div class="panel" id="panel-rules">
+  <div id="rules"><div class="empty"><div class="spin"></div>Загружаем…</div></div>
+</div>
+
+<div class="status-bar" id="statusBar">Обновление…</div>
+
+<!-- Лист продукта -->
+<div class="overlay" id="ovProduct" onclick="if(event.target===this)closeSheet('ovProduct')">
+  <div class="sheet" id="sheetProduct"></div>
+</div>
+<!-- Выбор региона -->
+<div class="overlay" id="ovRegion" onclick="if(event.target===this)closeSheet('ovRegion')">
+  <div class="sheet">
+    <div class="sh-head"><div class="c-body"><div class="sh-name">Регион</div></div>
+      <button class="sh-close" onclick="closeSheet('ovRegion')">×</button></div>
+    <div class="reg-list" id="regList"></div>
+  </div>
+</div>
+
+<script>
+  // Google Таблица с данными (доступ «Все, у кого есть ссылка» — просмотр)
+  const SHEET_ID = '1te1Wt3WJfSalA3LWrJVcsBFBhBCwbCN-qmc92QgpGi0';
+
+  const MONTHS = ['января','февраля','марта','апреля','мая','июня',
+                  'июля','августа','сентября','октября','ноября','декабря'];
+  const STORE_FILTERS = [
+    { id:'all',    label:'Все' },
+    { id:'cold',   label:'❄️ Холодильник' },
+    { id:'dry',    label:'📦 Сухое место' },
+    { id:'now',    label:'⚡ Сразу' },
+    { id:'short',  label:'⏱ До 3 дней' }
+  ];
+
+  let DATA = null;           // {regions, products, rules, updated}
+  let region = null;
+  let fCat = 'all', fStore = 'all', query = '';
+  let installPrompt = null;
+  let current = null;        // открытый продукт
+
+  // ── ХРАНИЛИЩЕ (в превью может быть недоступно) ──
+  function lsGet(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
+  function lsSet(k,v) { try { localStorage.setItem(k,v); } catch(e) {} }
+
+  // ── ЧАСЫ ──
+  function tick() {
+    const n = new Date();
+    document.getElementById('hClock').textContent = pad(n.getHours()) + ':' + pad(n.getMinutes());
+  }
+  function pad(x) { return String(x).padStart(2,'0'); }
+  setInterval(tick, 30000); tick();
+
+  // ── PWA ──
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault(); installPrompt = e;
+    document.getElementById('btnInstall').style.display = 'inline-block';
+  });
+  window.addEventListener('appinstalled', function() {
+    document.getElementById('btnInstall').style.display = 'none'; installPrompt = null;
+  });
+  function installPWA() {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    installPrompt.userChoice.then(function() {
+      installPrompt = null; document.getElementById('btnInstall').style.display = 'none';
+    });
+  }
+
+  // ── ВКЛАДКИ ──
+  function switchTab(id) {
+    ['list','rules'].forEach(function(t) {
+      document.getElementById('tab-'   + t).classList.toggle('active', t === id);
+      document.getElementById('panel-' + t).classList.toggle('active', t === id);
+    });
+    window.scrollTo(0,0);
+  }
+
+  // ── ЗАГРУЗКА ──
+  function loadAll() {
+    setStatus('Обновляем…');
+    if (window.EMBEDDED_DATA) { applyData(window.EMBEDDED_DATA, 'Демо-данные'); return; }
+    Promise.all(['Продукты','Правила','Основания'].map(loadSheet))
+      .then(function(t) {
+        const data = buildData(t[0], t[1], t[2]);
+        if (!data.products.length) throw new Error('пусто');
+        lsSet('sroki-data', JSON.stringify(data));
+        const n = new Date();
+        applyData(data, 'Обновлено в ' + pad(n.getHours()) + ':' + pad(n.getMinutes()));
+      })
+      .catch(function() {
+        const saved = lsGet('sroki-data');
+        if (saved) { applyData(JSON.parse(saved), 'Нет связи — показана сохранённая версия'); return; }
+        setStatus('Ошибка загрузки');
+        document.getElementById('list').innerHTML =
+          empty('⚠️','Не удалось загрузить перечень','Проверьте подключение к интернету');
+      });
+  }
+
+  // ── ЧТЕНИЕ ТАБЛИЦЫ ──
+  function loadSheet(name) {
+    const url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+                '/gviz/tq?tqx=out:csv&headers=1&sheet=' + encodeURIComponent(name) + '&t=' + Date.now();
+    return fetch(url).then(function(r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).then(function(txt) {
+      const rows = parseCSV(txt);
+      const head = (rows.shift() || []).map(function(h) { return h.trim(); });
+      return rows.map(function(row) {
+        const o = {}; head.forEach(function(h, i) { o[h] = (row[i] || '').trim(); }); return o;
+      });
+    });
+  }
+  function parseCSV(t) {
+    const rows = []; let row = [], cur = '', q = false;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (q) {
+        if (c === '"') { if (t[i+1] === '"') { cur += '"'; i++; } else q = false; }
+        else cur += c;
+      } else if (c === '"') q = true;
+      else if (c === ',') { row.push(cur); cur = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && t[i+1] === '\n') i++;
+        row.push(cur); rows.push(row); row = []; cur = '';
+      } else cur += c;
+    }
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter(function(r) { return r.some(function(x) { return x.trim(); }); });
+  }
+  function shown(r) { return (r['Показывать'] || 'да').toLowerCase() !== 'нет'; }
+  function buildData(prod, rules, basisRows) {
+    const basis = {};
+    basisRows.forEach(function(r) { if (r['Правило']) basis[r['Правило']] = r['Основание / предел применимости'] || ''; });
+    const regions = [];
+    const products = prod.filter(function(r) { return r['Продукт'] && shown(r); }).map(function(r) {
+      const reg = r['Регион'];
+      if (reg && regions.indexOf(reg) === -1) regions.push(reg);
+      const d = (r['Дней (для расчёта)'] || '').replace(',', '.');
+      return {
+        region: reg, category: r['Категория'] || 'Прочее', name: r['Продукт'],
+        srok: r['Срок после вскрытия'], days: d === '' || isNaN(+d) ? null : +d,
+        storage: r['Где хранить'], note: r['Важно'], rule: r['Правило'],
+        code: r['Код поставщика'], basis: basis[r['Правило']] || ''
+      };
+    });
+    return {
+      regions: regions, products: products,
+      rules: rules.filter(function(r) { return r['Текст'] && shown(r); })
+                  .map(function(r) { return { n: r['№'], title: r['Заголовок'], text: r['Текст'] }; }),
+      updated: ''
+    };
+  }
+  function setStatus(t) { document.getElementById('statusBar').textContent = t; }
+
+  function applyData(data, status) {
+    DATA = data;
+    DATA.products.forEach(function(p) { p._s = norm(p.name + ' ' + p.category); });
+    const fromUrl = new URLSearchParams(location.search).get('region');
+    const saved = lsGet('sroki-region');
+    region = [fromUrl, saved, region].filter(function(r) { return r && data.regions.indexOf(r) > -1; })[0]
+             || data.regions[0] || '';
+    lsSet('sroki-region', region);
+    document.getElementById('btnRegion').innerHTML = '📍<span class="rg-name"> ' + esc(region || '—') + '</span>';
+    document.getElementById('btnRegion').style.display = data.regions.length ? '' : 'none';
+    const cnt = regionProducts().length;
+    document.getElementById('hSub').textContent = cnt + ' ' + plural(cnt,'позиция','позиции','позиций') + ' · внутренний стандарт офиса';
+    setStatus(status + (data.updated ? ' · таблица: ' + data.updated : ''));
+    renderFilters(); renderList(); renderRules();
+  }
+
+  function regionProducts() {
+    return DATA.products.filter(function(p) { return !region || p.region === region; });
+  }
+
+  // ── ТИП СРОКА ──
+  function tier(p) {
+    if (p.days === null || p.days === undefined) return 'tn';
+    if (p.days === 0) return 't0';
+    if (p.days <= 3)  return 't1';
+    if (p.days <= 14) return 't2';
+    if (p.days <= 60) return 't3';
+    return 't4';
+  }
+  function isHours(p) { return /час/i.test(p.srok); }
+  function badge(p) {
+    const t = tier(p);
+    if (t === 'tn') return '<div class="badge word tn"><div class="num">по</div><div class="unit">упаковке</div></div>';
+    if (p.days === 0) {
+      const word = /в день/i.test(p.srok) ? 'в день' : 'сразу';
+      return '<div class="badge word t0"><div class="num">' + word + '</div><div class="unit">вскрытия</div></div>';
+    }
+    if (isHours(p))
+      return '<div class="badge ' + t + '"><div class="num">' + (p.days*24) + '</div><div class="unit">часов</div></div>';
+    return '<div class="badge ' + t + '"><div class="num">' + p.days + '</div><div class="unit">' + plural(p.days,'день','дня','дней') + '</div></div>';
+  }
+  function plural(n, a, b, c) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return a;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return b;
+    return c;
+  }
+  function isCold(p) { return /холодильник/i.test(p.storage) && !/^Сухое/i.test(p.storage); }
+  function storeIcon(p) { return isCold(p) ? '❄️' : '📦'; }
+
+  // ── ФИЛЬТРЫ ──
+  function renderFilters() {
+    const items = regionProducts();
+    const cats = {};
+    items.forEach(function(p) { cats[p.category] = (cats[p.category] || 0) + 1; });
+    let h = chip('cat','all','Все категории', items.length);
+    Object.keys(cats).forEach(function(c) { h += chip('cat', c, c, cats[c]); });
+    document.getElementById('catFilters').innerHTML = h;
+    document.getElementById('catSelect').innerHTML =
+      '<option value="all">Все категории (' + items.length + ')</option>' +
+      Object.keys(cats).map(function(c) {
+        return '<option value="' + esc(c) + '"' + (fCat === c ? ' selected' : '') + '>' + esc(c) + ' (' + cats[c] + ')</option>';
+      }).join('');
+    document.getElementById('storeFilters').innerHTML =
+      STORE_FILTERS.map(function(f) { return chip('store', f.id, f.label); }).join('');
+  }
+  function chip(kind, id, label, cnt) {
+    const on = (kind === 'cat' ? fCat : fStore) === id;
+    return '<button class="fchip' + (on ? ' on' : '') + '" onclick="setFilter(\'' + kind + '\',' +
+           escAttr(JSON.stringify(id)) + ')">' + esc(label) +
+           (cnt !== undefined ? '<span class="cnt">' + cnt + '</span>' : '') + '</button>';
+  }
+  function setFilter(kind, id) {
+    if (kind === 'cat') fCat = id; else fStore = id;
+    renderFilters(); renderList();
+  }
+  function onSearch() {
+    query = document.getElementById('q').value;
+    document.getElementById('searchBox').classList.toggle('has', !!query);
+    renderList();
+  }
+  function clearSearch() { document.getElementById('q').value = ''; onSearch(); }
+
+  function matchStore(p) {
+    switch (fStore) {
+      case 'cold':  return isCold(p);
+      case 'dry':   return !isCold(p);
+      case 'now':   return p.days === 0;
+      case 'short': return p.days !== null && p.days > 0 && p.days <= 3;
+      default:      return true;
+    }
+  }
+
+  // ── СПИСОК ──
+  function renderList() {
+    const q = norm(query.trim());
+    const words = q ? q.split(/\s+/) : [];
+    const items = regionProducts().filter(function(p) {
+      if (fCat !== 'all' && p.category !== fCat) return false;
+      if (!matchStore(p)) return false;
+      return words.every(function(w) { return p._s.indexOf(w) > -1; });
+    });
+    const el = document.getElementById('list');
+    if (!items.length) {
+      el.innerHTML = empty('🔍', 'Ничего не нашлось', query ? 'Попробуйте другое слово или сбросьте фильтры' : 'В этом регионе пока нет продуктов');
+      return;
+    }
+    const groups = {};
+    items.forEach(function(p) { (groups[p.category] = groups[p.category] || []).push(p); });
+    let h = '';
+    Object.keys(groups).forEach(function(c) {
+      h += '<div class="cat-title">' + esc(c) + ' · ' + groups[c].length + '</div><div class="grid">';
+      groups[c].forEach(function(p) {
+        const i = DATA.products.indexOf(p);
+        h += '<div class="card" onclick="openProduct(' + i + ')">' + badge(p) +
+             '<div class="c-body"><div class="c-name">' + hl(p.name, words) + '</div>' +
+             '<div class="c-store">' + storeIcon(p) + ' ' + esc(cardStore(p.storage)).replace(/([+−-]?\d+…[+−-]?\d+\u00a0°C)/, '<span style="white-space:nowrap">$1</span>') + '</div></div></div>';
+      });
+      h += '</div>';
+    });
+    el.innerHTML = h;
+  }
+  function shortStore(s) { return String(s || '').split(';')[0]; }
+  function cardStore(s) {
+    const first = shortStore(s);
+    const m = first.match(/^(.*?°C)/);
+    return (m ? m[1] : first).replace(/,\s*(?=[+−-]?\d)/, ' ').replace(/\s+°C/g, '\u00a0°C');
+  }
+
+  // ── ЛИСТ ПРОДУКТА ──
+  function openProduct(i) {
+    current = DATA.products[i];
+    const p = current;
+    let h = '<div class="sh-head">' + badge(p) +
+      '<div class="c-body"><div class="sh-cat">' + esc(p.category) + '</div>' +
+      '<div class="sh-name">' + esc(p.name) + '</div></div>' +
+      '<button class="sh-close" onclick="closeSheet(\'ovProduct\')">×</button></div>';
+
+    h += '<div class="sh-sec"><div class="sh-lbl">Срок после вскрытия</div><div class="sh-big">' + esc(p.srok) + '</div></div>';
+    h += '<div class="sh-sec"><div class="sh-lbl">' + storeIcon(p) + ' Где хранить</div><div class="sh-txt">' + esc(p.storage) + '</div></div>';
+    if (p.note) h += '<div class="sh-sec"><div class="sh-lbl">⚠️ Важно</div><div class="sh-txt">' + esc(p.note) + '</div></div>';
+
+    // калькулятор
+    h += '<div class="sh-sec calc"><div class="sh-lbl">🗓 До какого числа использовать</div>';
+    if (p.days === null || p.days === undefined) {
+      h += '<div class="until"><div class="u-val" style="font-size:20px">До даты на упаковке</div>' +
+           '<div class="u-note">Пока упаковка целая, срок — как на этикетке.</div></div>';
+    } else if (p.days === 0) {
+      h += '<div class="until now"><div class="u-val">' +
+           (/в день/i.test(p.srok) ? 'В день вскрытия — остаток списать в конце дня' : 'Использовать сразу, остаток не хранить') +
+           '</div></div>';
+    } else {
+      h += '<div class="calc-row"><span style="font-size:15px">Вскрыли:</span>' +
+           '<input type="datetime-local" id="openedAt" value="' + toLocalInput(new Date()) + '" onchange="updateUntil()">' +
+           '<button class="btn btn-sec" onclick="setNow()">Сейчас</button></div>' +
+           '<div class="until" id="untilBox"></div>';
+    }
+    h += '</div>';
+
+    if (p.basis || p.rule) {
+      h += '<details class="basis"><summary>Основание срока' + (p.rule ? ' · ' + esc(p.rule) : '') + '</summary>' +
+           '<p>' + esc(p.basis || '—') + '</p>' +
+           '<p>Это внутренний стандарт офиса, а не срок производителя. Если на упаковке указано строже — действует упаковка.</p>' +
+           (p.code ? '<p>Код поставщика: ' + esc(p.code) + '</p>' : '') + '</details>';
+    }
+
+    document.getElementById('sheetProduct').innerHTML = h;
+    document.getElementById('ovProduct').classList.add('open');
+    document.getElementById('sheetProduct').scrollTop = 0;
+    if (p.days > 0) updateUntil();
+  }
+  function setNow() { document.getElementById('openedAt').value = toLocalInput(new Date()); updateUntil(); }
+  function updateUntil() {
+    const p = current, inp = document.getElementById('openedAt');
+    const opened = inp && inp.value ? new Date(inp.value) : new Date();
+    const until = new Date(opened.getTime() + p.days * 24 * 3600 * 1000);
+    const withTime = p.days <= 3 || isHours(p);
+    const untilTxt = fmtDate(until) + (withTime ? ', ' + pad(until.getHours()) + ':' + pad(until.getMinutes()) : '');
+    const expired = until < new Date();
+    document.getElementById('untilBox').className = 'until' + (expired ? ' now' : '');
+    document.getElementById('untilBox').innerHTML =
+      '<div class="u-lbl">' + (expired ? 'Срок истёк' : 'Использовать до') + '</div>' +
+      '<div class="u-val">' + untilTxt + '</div>' +
+      '<div class="u-note">Но не позже даты на упаковке — действует более ранняя.</div>' +
+      '<div class="label-prev">' +
+        '<div><b>Продукт</b>' + esc(p.name) + '</div>' +
+        '<div><b>Вскрыто</b>' + fmtDate(opened) + ', ' + pad(opened.getHours()) + ':' + pad(opened.getMinutes()) + '</div>' +
+        '<div><b>Использовать до</b>' + untilTxt + '</div>' +
+        '<div><b>Хранение</b>' + esc(shortStore(p.storage)) + '</div>' +
+      '</div>';
+  }
+  function fmtDate(d) { return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
+  function toLocalInput(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { closeSheet('ovProduct'); closeSheet('ovRegion'); }
+  });
+
+  // ── РЕГИОНЫ ──
+  function openRegions() {
+    if (!DATA) return;
+    document.getElementById('regList').innerHTML = DATA.regions.map(function(r) {
+      return '<button class="reg-item' + (r === region ? ' on' : '') + '" onclick="setRegion(' +
+             escAttr(JSON.stringify(r)) + ')">📍 ' + esc(r) + '</button>';
+    }).join('') + (DATA.regions.length < 2 ? '<p style="color:var(--muted);font-size:13px;padding:4px 2px">Другие регионы появятся, когда их добавят в таблицу.</p>' : '');
+    document.getElementById('ovRegion').classList.add('open');
+  }
+  function setRegion(r) {
+    region = r; lsSet('sroki-region', r); fCat = 'all';
+    document.getElementById('btnRegion').innerHTML = '📍<span class="rg-name"> ' + esc(r) + '</span>';
+    const cnt = regionProducts().length;
+    document.getElementById('hSub').textContent = cnt + ' ' + plural(cnt,'позиция','позиции','позиций') + ' · внутренний стандарт офиса';
+    closeSheet('ovRegion'); renderFilters(); renderList();
+  }
+
+  // ── ПРАВИЛА ──
+  function renderRules() {
+    const legend = [['t0','Сразу / в день'],['t1','До 3 дней'],['t2','До 14 дней'],['t3','До 60 дней'],['t4','Дольше'],['tn','По упаковке']];
+    let h = '<div class="notice"><b>Главное:</b> срок считается от вскрытия заводской упаковки (для развеса — от вскрытия мешка поставщика). ' +
+            'Если на упаковке срок раньше — действует упаковка. Сроки — внутренний стандарт офиса, а не данные производителя.</div>';
+    h += '<div class="sh-lbl" style="margin:4px 2px 8px">Цвет срока</div><div class="legend">' + legend.map(function(l) {
+      return '<span class="lg ' + l[0] + '">' + l[1] + '</span>';
+    }).join('') + '</div>';
+    h += '<div class="rules">' + (DATA.rules || []).map(function(r, i) {
+      return '<div class="rule"><div class="rn">' + (r.n || i+1) + '</div><div>' +
+             (r.title ? '<div class="rt">' + esc(r.title) + '</div>' : '') +
+             '<div class="rx">' + esc(r.text) + '</div></div></div>';
+    }).join('') + '</div>';
+    document.getElementById('rules').innerHTML = h;
+  }
+
+  // ── УТИЛИТЫ ──
+  function norm(s) { return String(s || '').toLowerCase().replace(/ё/g,'е'); }
+  function hl(text, words) {
+    let out = esc(text);
+    if (!words.length) return out;
+    const n = norm(text);
+    // подсветка первого вхождения каждого слова
+    const ranges = [];
+    words.forEach(function(w) { const i = n.indexOf(w); if (i > -1) ranges.push([i, i + w.length]); });
+    if (!ranges.length) return out;
+    ranges.sort(function(a,b) { return a[0]-b[0]; });
+    let res = '', pos = 0;
+    ranges.forEach(function(r) {
+      if (r[0] < pos) return;
+      res += esc(text.slice(pos, r[0])) + '<mark>' + esc(text.slice(r[0], r[1])) + '</mark>';
+      pos = r[1];
+    });
+    return res + esc(text.slice(pos));
+  }
+  function empty(ico, ttl, sub) {
+    return '<div class="empty"><div class="ico">' + ico + '</div><div class="ttl">' + ttl + '</div><div>' + sub + '</div></div>';
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escAttr(s) { return esc(s).replace(/'/g,'&#39;'); }
+
+  // ── SERVICE WORKER ──
+  if ('serviceWorker' in navigator && !window.EMBEDDED_DATA) {
+    navigator.serviceWorker.register('sw.js').catch(function(e) { console.log('SW ошибка:', e); });
+  }
+
+  // ── СТАРТ ──
+  loadAll();
+  setInterval(loadAll, 10 * 60 * 1000);
+</script>
+</body>
+</html>
