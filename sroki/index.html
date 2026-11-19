@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Сроки">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -55,7 +55,15 @@
       border-radius:10px; padding:10px 14px; font-size:16px; cursor:pointer; min-height:46px; min-width:46px;
     }
     .btn-region { font-weight:600; }
-    .btn-install { display:none; }
+    .btn-install { font-weight:600; }
+    @media (display-mode: standalone) { .btn-install { display:none !important; } }
+    .inst-step { display:flex; gap:14px; align-items:flex-start; margin:0 14px 12px; background:var(--white);
+      border-radius:14px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.05); font-size:19px; line-height:1.45; }
+    .inst-step .rn { flex-shrink:0; width:40px; height:40px; border-radius:50%; background:var(--navy); color:#fff;
+      font-weight:700; display:flex; align-items:center; justify-content:center; font-size:19px; }
+    .inst-ico { display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:34px; padding:0 8px;
+      border:2px solid var(--brd); border-radius:8px; background:var(--bg); font-weight:700; vertical-align:middle; margin:0 2px; }
+    .inst-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:14px 14px 12px; }
 
     /* ── ВКЛАДКИ ── */
     .tabs { display:flex; background:var(--navy); border-top:1px solid rgba(255,255,255,.15); }
@@ -242,7 +250,7 @@
     <div class="h-clock" id="hClock">—:—</div>
     <button class="btn-hdr btn-region" id="btnRegion" onclick="openRegions()">—</button>
     <button class="btn-hdr" onclick="loadAll()" title="Обновить">↻</button>
-    <button class="btn-hdr btn-install" id="btnInstall" onclick="installPWA()">⬇ Установить</button>
+    <button class="btn-hdr btn-install" id="btnInstall" onclick="installPWA()">⬇<span class="rg-name"> Установить</span></button>
   </div>
 </div>
 
@@ -276,6 +284,10 @@
 <!-- Лист продукта -->
 <div class="overlay" id="ovProduct" onclick="if(event.target===this)closeSheet('ovProduct')">
   <div class="sheet" id="sheetProduct"></div>
+</div>
+<!-- Как установить -->
+<div class="overlay" id="ovInstall" onclick="if(event.target===this)closeSheet('ovInstall')">
+  <div class="sheet" id="sheetInstall"></div>
 </div>
 <!-- Выбор региона -->
 <div class="overlay" id="ovRegion" onclick="if(event.target===this)closeSheet('ovRegion')">
@@ -321,17 +333,65 @@
   // ── PWA ──
   window.addEventListener('beforeinstallprompt', function(e) {
     e.preventDefault(); installPrompt = e;
-    document.getElementById('btnInstall').style.display = 'inline-block';
   });
   window.addEventListener('appinstalled', function() {
     document.getElementById('btnInstall').style.display = 'none'; installPrompt = null;
   });
   function installPWA() {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    installPrompt.userChoice.then(function() {
-      installPrompt = null; document.getElementById('btnInstall').style.display = 'none';
-    });
+    if (installPrompt) {
+      installPrompt.prompt();
+      installPrompt.userChoice.then(function() { installPrompt = null; });
+      return;
+    }
+    showInstallHelp(detectDevice());
+  }
+  function detectDevice() {
+    const ua = navigator.userAgent;
+    const ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (ios) return /CriOS|YaBrowser|FxiOS/.test(ua) ? 'ios-other' : 'ios';
+    if (/YaBrowser/.test(ua)) return 'yandex';
+    if (/SamsungBrowser/.test(ua)) return 'samsung';
+    if (/Android/.test(ua)) return 'android';
+    return 'desktop';
+  }
+  const INSTALL_HELP = {
+    ios: { name:'iPad / iPhone (Safari)', steps:[
+      'Нажмите кнопку <span class="inst-ico">⬆</span> «Поделиться». На iPad она вверху справа, на iPhone — внизу по центру.',
+      'Пролистайте список вниз и выберите <b>«На экран „Домой“»</b>.',
+      'Нажмите <b>«Добавить»</b> вверху справа. На экране появится иконка «Сроки».']},
+    'ios-other': { name:'iPad / iPhone (другой браузер)', steps:[
+      'Добавить на экран «Домой» на iPad и iPhone можно только из <b>Safari</b>.',
+      'Скопируйте адрес этой страницы и откройте его в Safari.',
+      'Дальше: <span class="inst-ico">⬆</span> «Поделиться» → <b>«На экран „Домой“»</b> → <b>«Добавить»</b>.']},
+    android: { name:'Android (Chrome)', steps:[
+      'Нажмите <span class="inst-ico">⋮</span> (три точки) вверху справа.',
+      'Выберите <b>«Установить приложение»</b> или <b>«Добавить на главный экран»</b>.',
+      'Нажмите <b>«Установить»</b>. На экране появится иконка «Сроки».']},
+    samsung: { name:'Samsung Internet', steps:[
+      'Нажмите <span class="inst-ico">☰</span> (меню) внизу справа.',
+      'Выберите <b>«Добавить страницу на»</b> → <b>«Главный экран»</b>.',
+      'Нажмите <b>«Добавить»</b>.']},
+    yandex: { name:'Яндекс Браузер', steps:[
+      'Нажмите <span class="inst-ico">⋮</span> (три точки) рядом с адресной строкой или внизу.',
+      'Выберите <b>«Добавить ярлык»</b> или <b>«На главный экран»</b>.',
+      'Подтвердите — на экране появится иконка.']},
+    desktop: { name:'Компьютер', steps:[
+      'В Chrome или Edge нажмите значок установки <span class="inst-ico">⊕</span> в правой части адресной строки.',
+      'Нажмите <b>«Установить»</b>.']}
+  };
+  function showInstallHelp(dev) {
+    const h = INSTALL_HELP[dev];
+    let html = '<div class="sh-head"><div class="c-body"><div class="sh-cat">Как установить</div>' +
+      '<div class="sh-name">' + h.name + '</div></div>' +
+      '<button class="sh-close" onclick="closeSheet(\'ovInstall\')">×</button></div>' +
+      '<div style="height:12px"></div>' +
+      h.steps.map(function(t, i) { return '<div class="inst-step"><div class="rn">' + (i+1) + '</div><div>' + t + '</div></div>'; }).join('') +
+      '<div class="sh-lbl" style="margin:18px 16px 0">Другое устройство:</div><div class="inst-tabs">' +
+      Object.keys(INSTALL_HELP).filter(function(k) { return k !== dev; }).map(function(k) {
+        return '<button class="fchip" onclick="showInstallHelp(\'' + k + '\')">' + INSTALL_HELP[k].name + '</button>';
+      }).join('') + '</div>';
+    document.getElementById('sheetInstall').innerHTML = html;
+    document.getElementById('ovInstall').classList.add('open');
   }
 
   // ── ВКЛАДКИ ──
@@ -618,7 +678,7 @@
   }
   function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') { closeSheet('ovProduct'); closeSheet('ovRegion'); }
+    if (e.key === 'Escape') { closeSheet('ovProduct'); closeSheet('ovRegion'); closeSheet('ovInstall'); }
   });
 
   // ── РЕГИОНЫ ──
